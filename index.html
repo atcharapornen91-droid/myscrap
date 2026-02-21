@@ -1,59 +1,57 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>My Scrap Photobooth</title>
-
 <style>
-body {
+body{
   margin:0;
   display:flex;
   justify-content:center;
   background:#000;
 }
 
-.story {
+.story{
   position:relative;
   width:100vw;
   max-width:430px;
   aspect-ratio:9/16;
   overflow:hidden;
-  background:#fff;
 }
 
-.story img.bg {
-  position:absolute;
+.bg{
   width:100%;
   height:100%;
   object-fit:cover;
+  position:absolute;
   z-index:1;
 }
 
-video {
+video{
   position:absolute;
-  top:0;
-  left:0;
+  inset:0;
   width:100%;
   height:100%;
   object-fit:cover;
   z-index:2;
 }
 
-.countdown {
+.frame{
   position:absolute;
-  top:50%;
-  left:50%;
-  transform:translate(-50%,-50%);
-  font-size:80px;
-  color:white;
-  font-weight:bold;
-  z-index:5;
+  width:18%;
+  aspect-ratio:3/4;
+  overflow:hidden;
+  z-index:3;
 }
 
-.controls {
+.frame img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.controls{
   position:absolute;
-  bottom:20px;
+  bottom:15px;
   width:100%;
   display:flex;
   justify-content:center;
@@ -61,140 +59,112 @@ video {
   z-index:10;
 }
 
-button {
+button{
   padding:10px 15px;
   border:none;
   border-radius:20px;
-  font-size:14px;
 }
 </style>
 </head>
-
 <body>
 
 <div class="story">
-  <img src="Scrap.jpg" class="bg" id="bg" />
+
+  <img src="Scrap.jpg" class="bg">
+
   <video id="video" autoplay playsinline></video>
-  <div class="countdown" id="countdown"></div>
+
+  <!-- สร้าง 20 ช่อง -->
+  <div id="frames"></div>
 
   <div class="controls">
-    <button onclick="startCapture()">Start</button>
-    <button onclick="flipCamera()">Flip</button>
-    <button onclick="exportImage()">Export JPG</button>
+    <button onclick="capture()">📸</button>
+    <button onclick="flip()">Flip</button>
+    <button onclick="exportImg()">Export</button>
   </div>
 </div>
 
 <script>
 let video = document.getElementById("video");
-let countdownEl = document.getElementById("countdown");
-let facingMode = "user";
+let framesContainer = document.getElementById("frames");
+let facing = "user";
 let stream;
-let shots = [];
-let totalShots = 20;
+let currentIndex = 0;
+let total = 20;
 
-async function startCamera() {
+async function startCamera(){
   if(stream) stream.getTracks().forEach(t=>t.stop());
 
   stream = await navigator.mediaDevices.getUserMedia({
-    video:{ facingMode: facingMode }
+    video:{ facingMode:facing }
   });
 
   video.srcObject = stream;
 }
 
-function flipCamera(){
-  facingMode = facingMode === "user" ? "environment" : "user";
+function flip(){
+  facing = facing === "user" ? "environment" : "user";
   startCamera();
 }
 
-async function startCapture(){
-  shots = [];
-  await startCamera();
-  captureLoop(0);
-}
+startCamera();
 
-function captureLoop(i){
-  if(i >= totalShots){
-    video.style.display = "none";
-    return;
+/* === วางตำแหน่งเฟรมแบบ grid 4x5 ให้ตรงกับภาพ === */
+
+let cols = 4;
+let rows = 5;
+
+for(let r=0;r<rows;r++){
+  for(let c=0;c<cols;c++){
+    let f = document.createElement("div");
+    f.className="frame";
+
+    f.style.left = (8 + c*22) + "%";
+    f.style.top  = (18 + r*15) + "%";
+
+    framesContainer.appendChild(f);
   }
-
-  startCountdown(3, ()=>{
-    capturePhoto();
-    setTimeout(()=>captureLoop(i+1),500);
-  });
 }
 
-function startCountdown(num, callback){
-  countdownEl.innerText = num;
-  let interval = setInterval(()=>{
-    num--;
-    if(num <=0){
-      clearInterval(interval);
-      countdownEl.innerText="";
-      callback();
-    } else {
-      countdownEl.innerText = num;
-    }
-  },1000);
-}
+function capture(){
+  if(currentIndex >= total) return;
 
-function capturePhoto(){
   let canvas = document.createElement("canvas");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   let ctx = canvas.getContext("2d");
 
-  if(facingMode === "user"){
+  if(facing === "user"){
     ctx.translate(canvas.width,0);
     ctx.scale(-1,1);
   }
 
   ctx.drawImage(video,0,0);
-  shots.push(canvas);
+
+  let img = document.createElement("img");
+  img.src = canvas.toDataURL("image/jpeg");
+
+  framesContainer.children[currentIndex].appendChild(img);
+  currentIndex++;
 }
 
-function exportImage(){
-  if(shots.length !== totalShots){
-    alert("ถ่ายให้ครบ 20 รูปก่อนนะคะ");
+function exportImg(){
+  if(currentIndex < total){
+    alert("ยังไม่ครบ 20 รูป");
     return;
   }
 
-  let finalCanvas = document.createElement("canvas");
-  finalCanvas.width = 1080;
-  finalCanvas.height = 1920;
-  let ctx = finalCanvas.getContext("2d");
-
-  let bg = document.getElementById("bg");
-  ctx.drawImage(bg,0,0,1080,1920);
-
-  let cols = 4;
-  let rows = 5;
-  let imgW = 200;
-  let imgH = 300;
-  let startX = 100;
-  let startY = 300;
-  let gapX = 200;
-  let gapY = 300;
-
-  let index = 0;
-  for(let r=0;r<rows;r++){
-    for(let c=0;c<cols;c++){
-      let x = startX + c*gapX;
-      let y = startY + r*gapY;
-      ctx.drawImage(shots[index], x, y, imgW, imgH);
-      index++;
-    }
-  }
-
-  let link = document.createElement("a");
-  link.download = "myscrap.jpg";
-  link.href = finalCanvas.toDataURL("image/jpeg",1.0);
-  link.click();
+  html2canvas(document.querySelector(".story")).then(canvas=>{
+    let link = document.createElement("a");
+    link.download="myscrap.jpg";
+    link.href = canvas.toDataURL("image/jpeg",1.0);
+    link.click();
+  });
 }
-
-startCamera();
 </script>
+
+<!-- โหลด html2canvas -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 </body>
 </html>
